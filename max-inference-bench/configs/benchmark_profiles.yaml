@@ -1,0 +1,50 @@
+profiles:
+  quick:
+    description: "Fast smoke test — small prompt set, low concurrency"
+    num_prompts: 50
+    dataset: "sonnet"
+    sonnet_input_len: 256
+    output_lengths: 128
+    sonnet_prefix_len: 100
+    concurrency_levels: [1, 4]
+    warmup_requests: 5
+
+  standard:
+    description: "Production-representative sweep"
+    num_prompts: 500
+    dataset: "sonnet"
+    sonnet_input_len: 550
+    output_lengths: 256
+    sonnet_prefix_len: 200
+    concurrency_levels: [1, 4, 8, 16, 32]
+    warmup_requests: 20
+
+  stress:
+    description: "Peak throughput and tail latency under heavy load"
+    num_prompts: 2000
+    dataset: "sharegpt"
+    concurrency_levels: [16, 32, 64, 128]
+    warmup_requests: 50
+
+  long_context:
+    description: "Long-context performance characterization"
+    num_prompts: 200
+    dataset: "arxiv-summarization"
+    concurrency_levels: [1, 4, 8]
+    warmup_requests: 10
+
+metrics:
+  primary:
+    - ttft_p50
+    - ttft_p95
+    - ttft_p99
+    - tpot_p50
+    - tpot_p95
+    - itl_p50
+    - itl_p99
+    - throughput_tokens_per_sec
+    - throughput_requests_per_sec
+  secondary:
+    - gpu_utilization_mean
+    - gpu_memory_peak_gb
+    - gpu_power_draw_mean_w

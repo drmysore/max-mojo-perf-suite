@@ -1,0 +1,58 @@
+models:
+  llama3_1_8b:
+    name: "meta-llama/Llama-3.1-8B-Instruct"
+    family: "llama"
+    params: "8B"
+    quantizations:
+      - encoding: "bfloat16"
+        label: "BF16 (baseline)"
+        weight_path: null
+      - encoding: "q4_k"
+        label: "Q4_K (4-bit GGUF)"
+        weight_path: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+      - encoding: "q6_k"
+        label: "Q6_K (6-bit GGUF)"
+        weight_path: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/Meta-Llama-3.1-8B-Instruct-Q6_K.gguf"
+      - encoding: "gptq"
+        label: "GPTQ-INT4"
+        weight_path: null
+        model_override: "hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4"
+      - encoding: "float8_e4m3fn"
+        label: "FP8 E4M3"
+        weight_path: null
+
+  mistral_nemo_12b:
+    name: "mistralai/Mistral-Nemo-Instruct-2407"
+    family: "mistral"
+    params: "12B"
+    quantizations:
+      - encoding: "bfloat16"
+        label: "BF16 (baseline)"
+        weight_path: null
+      - encoding: "q4_k"
+        label: "Q4_K (4-bit GGUF)"
+        weight_path: null
+      - encoding: "q6_k"
+        label: "Q6_K (6-bit GGUF)"
+        weight_path: null
+
+  gemma3_27b:
+    name: "google/gemma-3-27b-it"
+    family: "gemma"
+    params: "27B"
+    quantizations:
+      - encoding: "bfloat16"
+        label: "BF16 (baseline)"
+        weight_path: null
+      - encoding: "q4_k"
+        label: "Q4_K (4-bit)"
+        weight_path: null
+
+hardware_targets:
+  nvidia:
+    - "H100"
+    - "A100"
+    - "RTX 4090"
+  amd:
+    - "MI300X"
+    - "MI325X"

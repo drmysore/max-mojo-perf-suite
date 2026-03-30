@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  max-server:
+    image: modular/max-nvidia-full:latest
+    container_name: max-bench-nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
+      - ${MAX_CACHE:-~/.max_cache}:/root/.max_cache
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+    command: >
+      --model meta-llama/Llama-3.1-8B-Instruct
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  benchmark-runner:
+    image: python:3.11-slim
+    container_name: max-bench-runner
+    depends_on:
+      max-server:
+        condition: service_healthy
+    volumes:
+      - ./max-inference-bench:/bench
+      - ./results:/bench/results
+    working_dir: /bench
+    command: >
+      bash -c "pip install pyyaml requests && python scripts/run_benchmark.py --profile quick --hardware nvidia --dry-run"

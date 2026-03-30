@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Dr. Mysore Supreeth">
+<title>MAX + Mojo Performance Suite — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-card: #111827;
+    --bg-card-hover: #1a2332;
+    --border: #1e293b;
+    --accent-nvidia: #76b900;
+    --accent-amd: #ed1c24;
+    --accent-mojo: #ff6f00;
+    --accent-blue: #3b82f6;
+    --accent-purple: #8b5cf6;
+    --accent-cyan: #06b6d4;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --glow-nvidia: rgba(118, 185, 0, 0.15);
+    --glow-amd: rgba(237, 28, 36, 0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .noise-overlay {
+    position: fixed; inset: 0; pointer-events: none; z-index: 1000;
+    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
+    opacity: 0.4;
+  }
+
+  .header {
+    padding: 2.5rem 3rem 1.5rem;
+    background: linear-gradient(135deg, var(--bg-primary) 0%, #0f1729 100%);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .header::before {
+    content: '';
+    position: absolute; top: 0; right: 0;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, var(--glow-nvidia) 0%, transparent 70%);
+    transform: translate(30%, -50%);
+  }
+
+  .header::after {
+    content: '';
+    position: absolute; bottom: 0; left: 20%;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, var(--glow-amd) 0%, transparent 70%);
+    transform: translate(-30%, 50%);
+  }
+
+  .header-content { position: relative; z-index: 1; }
+
+  .title-row {
+    display: flex; align-items: center; gap: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .logo {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--accent-mojo), var(--accent-nvidia));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800; font-size: 18px; color: #000;
+  }
+
+  h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800; font-size: 1.6rem;
+    letter-spacing: -0.03em;
+    background: linear-gradient(90deg, var(--text-primary), var(--accent-cyan));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    font-size: 0.9rem; color: var(--text-secondary);
+    margin-left: 3.5rem;
+  }
+
+  .tags {
+    display: flex; gap: 0.5rem; margin-top: 1rem; margin-left: 3.5rem;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    padding: 0.25rem 0.75rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+  }
+
+  .tag.nvidia { border-color: var(--accent-nvidia); color: var(--accent-nvidia); }
+  .tag.amd { border-color: var(--accent-amd); color: var(--accent-amd); }
+  .tag.mojo { border-color: var(--accent-mojo); color: var(--accent-mojo); }
+
+  .dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.25rem;
+    padding: 1.5rem 3rem 3rem;
+    max-width: 1400px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--text-muted);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+
+  .card-header {
+    display: flex; align-items: center; gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+
+  .card-icon {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+
+  .card-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600; font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .card.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  .metric {
+    text-align: center;
+    padding: 0.75rem 0.5rem;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.03);
+  }
+
+  .metric-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: 1.6rem;
+    line-height: 1.2;
+  }
+
+  .metric-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+    letter-spacing: 0.03em;
+  }
+
+  .metric-delta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    margin-top: 0.15rem;
+  }
+
+  .delta-good { color: var(--accent-nvidia); }
+  .delta-bad { color: var(--accent-amd); }
+
+  .chart-container {
+    position: relative;
+    height: 260px;
+    width: 100%;
+  }
+
+  .model-matrix {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+  }
+
+  .model-matrix th, .model-matrix td {
+    padding: 0.6rem 0.75rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .model-matrix th {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .model-matrix td:first-child {
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .check { color: var(--accent-nvidia); }
+  .cross { color: var(--text-muted); }
+
+  .kernel-list {
+    display: flex; flex-direction: column; gap: 0.75rem;
+  }
+
+  .kernel-item {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 0.75rem;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.03);
+  }
+
+  .kernel-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: var(--accent-cyan);
+    min-width: 120px;
+  }
+
+  .kernel-desc {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    flex: 1;
+  }
+
+  .kernel-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .badge-gpu { background: rgba(139,92,246,0.15); color: var(--accent-purple); }
+  .badge-opt { background: rgba(6,182,212,0.15); color: var(--accent-cyan); }
+
+  .pipeline-flow {
+    display: flex; align-items: center; gap: 0.5rem;
+    overflow-x: auto; padding: 1rem 0;
+  }
+
+  .pipeline-step {
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    transition: all 0.2s;
+  }
+
+  .pipeline-step:hover {
+    transform: scale(1.05);
+    border-color: var(--accent-mojo);
+  }
+
+  .pipeline-arrow {
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+
+  .quant-bar-group {
+    display: flex; flex-direction: column; gap: 0.6rem;
+  }
+
+  .quant-row {
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+
+  .quant-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    min-width: 80px;
+    text-align: right;
+  }
+
+  .quant-bar-track {
+    flex: 1; height: 22px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .quant-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: #000;
+  }
+
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 1rem 3rem 0;
+    max-width: 1400px;
+  }
+
+  @keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card { animation: fadeSlideUp 0.5s ease both; }
+  .card:nth-child(2) { animation-delay: 0.05s; }
+  .card:nth-child(3) { animation-delay: 0.1s; }
+  .card:nth-child(4) { animation-delay: 0.15s; }
+  .card:nth-child(5) { animation-delay: 0.2s; }
+  .card:nth-child(6) { animation-delay: 0.25s; }
+  .card:nth-child(7) { animation-delay: 0.3s; }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div class="header">
+  <div class="header-content">
+    <div class="title-row">
+      <div class="logo">M+</div>
+      <h1>MAX + Mojo Performance Suite</h1>
+    </div>
+    <div class="subtitle">By Dr. Mysore Supreeth — Systematic inference benchmarking & GPU kernel optimization on NVIDIA and AMD</div>
+    <div class="tags">
+      <span class="tag nvidia">NVIDIA H100 / A100 / RTX 4090</span>
+      <span class="tag amd">AMD MI300X / MI325X</span>
+      <span class="tag mojo">Mojo GPU Kernels</span>
+      <span class="tag">BF16</span>
+      <span class="tag">Q4_K</span>
+      <span class="tag">Q6_K</span>
+      <span class="tag">GPTQ-INT4</span>
+      <span class="tag">FP8</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-label">Inference Performance Baseline (Simulated)</div>
+
+<div class="dashboard">
+
+  <!-- Throughput Overview -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(118,185,0,0.15)">
+        <span style="color:var(--accent-nvidia)">N</span>
+      </div>
+      <span class="card-title">NVIDIA Throughput</span>
+    </div>
+    <div class="metric-grid">
+      <div class="metric">
+        <div class="metric-value" style="color:var(--accent-nvidia)">2,847</div>
+        <div class="metric-label">tok/s BF16</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" style="color:var(--accent-nvidia)">4,312</div>
+        <div class="metric-label">tok/s Q4_K</div>
+        <div class="metric-delta delta-good">+51.4%</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" style="color:var(--accent-nvidia)">5,108</div>
+        <div class="metric-label">tok/s GPTQ</div>
+        <div class="metric-delta delta-good">+79.4%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(237,28,36,0.15)">
+        <span style="color:var(--accent-amd)">A</span>
+      </div>
+      <span class="card-title">AMD Throughput</span>
+    </div>
+    <div class="metric-grid">
+      <div class="metric">
+        <div class="metric-value" style="color:var(--accent-amd)">2,510</div>
+        <div class="metric-label">tok/s BF16</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" style="color:var(--accent-amd)">3,920</div>
+        <div class="metric-label">tok/s Q4_K</div>
+        <div class="metric-delta delta-good">+56.2%</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" style="color:var(--accent-amd)">4,650</div>
+        <div class="metric-label">tok/s GPTQ</div>
+        <div class="metric-delta delta-good">+85.3%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(59,130,246,0.15)">
+        <span style="color:var(--accent-blue)">L</span>
+      </div>
+      <span class="card-title">Latency (Llama 3.1 8B)</span>
+    </div>
+    <div class="metric-grid">
+      <div class="metric">
+        <div class="metric-value" style="color:var(--accent-blue)">18.2</div>
+        <div class="metric-label">TTFT P50 ms</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" style="color:var(--accent-blue)">31.5</div>
+        <div class="metric-label">TTFT P95 ms</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" style="color:var(--accent-blue)">6.8</div>
+        <div class="metric-label">ITL P50 ms</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Throughput Chart -->
+  <div class="card full-width">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(139,92,246,0.15)">
+        <span style="color:var(--accent-purple)">C</span>
+      </div>
+      <span class="card-title">Throughput by Quantization — Llama 3.1 8B</span>
+    </div>
+    <div class="chart-container">
+      <canvas id="throughputChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Quantization Bars -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(255,111,0,0.15)">
+        <span style="color:var(--accent-mojo)">Q</span>
+      </div>
+      <span class="card-title">Memory Savings vs BF16</span>
+    </div>
+    <div class="quant-bar-group" id="memBars"></div>
+  </div>
+
+  <!-- Model Matrix -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(6,182,212,0.15)">
+        <span style="color:var(--accent-cyan)">M</span>
+      </div>
+      <span class="card-title">Model x Quantization Matrix</span>
+    </div>
+    <table class="model-matrix">
+      <thead>
+        <tr><th style="text-align:left">Model</th><th>BF16</th><th>Q4_K</th><th>Q6_K</th><th>GPTQ</th><th>FP8</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Llama 3.1 8B</td>
+          <td class="check">&#10003;</td><td class="check">&#10003;</td>
+          <td class="check">&#10003;</td><td class="check">&#10003;</td>
+          <td class="check">&#10003;</td>
+        </tr>
+        <tr>
+          <td>Mistral Nemo 12B</td>
+          <td class="check">&#10003;</td><td class="check">&#10003;</td>
+          <td class="check">&#10003;</td><td class="cross">&mdash;</td>
+          <td class="cross">&mdash;</td>
+        </tr>
+        <tr>
+          <td>Gemma 3 27B</td>
+          <td class="check">&#10003;</td><td class="check">&#10003;</td>
+          <td class="cross">&mdash;</td><td class="cross">&mdash;</td>
+          <td class="cross">&mdash;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="section-label">GPU Kernel Engineering</div>
+
+<div class="dashboard">
+  <!-- Kernel List -->
+  <div class="card full-width">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(255,111,0,0.15)">
+        <span style="color:var(--accent-mojo)">K</span>
+      </div>
+      <span class="card-title">Mojo GPU Kernels</span>
+    </div>
+    <div class="kernel-list">
+      <div class="kernel-item">
+        <span class="kernel-name">vector_add</span>
+        <span class="kernel-desc">Grid/block decomposition, device memory validation</span>
+        <span class="kernel-badge badge-gpu">GPU</span>
+      </div>
+      <div class="kernel-item">
+        <span class="kernel-name">matmul_tiled</span>
+        <span class="kernel-desc">Naive vs tiled with shared memory — memory hierarchy optimization</span>
+        <span class="kernel-badge badge-opt">OPTIMIZED</span>
+      </div>
+      <div class="kernel-item">
+        <span class="kernel-name">softmax</span>
+        <span class="kernel-desc">Three-pass naive vs single-pass online — kernel fusion for attention</span>
+        <span class="kernel-badge badge-opt">FUSED</span>
+      </div>
+      <div class="kernel-item">
+        <span class="kernel-name">reduction</span>
+        <span class="kernel-desc">Parallel tree reduction with sequential addressing optimization</span>
+        <span class="kernel-badge badge-gpu">GPU</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Latency Chart -->
+  <div class="card full-width">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(59,130,246,0.15)">
+        <span style="color:var(--accent-blue)">P</span>
+      </div>
+      <span class="card-title">Latency Distribution — TTFT by Quantization</span>
+    </div>
+    <div class="chart-container">
+      <canvas id="latencyChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Pipeline Flow -->
+  <div class="card full-width">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(6,182,212,0.15)">
+        <span style="color:var(--accent-cyan)">F</span>
+      </div>
+      <span class="card-title">Benchmark Pipeline</span>
+    </div>
+    <div class="pipeline-flow">
+      <div class="pipeline-step" style="border-color:var(--accent-mojo)">Config YAML</div>
+      <span class="pipeline-arrow">&rarr;</span>
+      <div class="pipeline-step">Docker Launch</div>
+      <span class="pipeline-arrow">&rarr;</span>
+      <div class="pipeline-step" style="border-color:var(--accent-nvidia)">max serve</div>
+      <span class="pipeline-arrow">&rarr;</span>
+      <div class="pipeline-step">Health Check</div>
+      <span class="pipeline-arrow">&rarr;</span>
+      <div class="pipeline-step" style="border-color:var(--accent-blue)">max benchmark</div>
+      <span class="pipeline-arrow">&rarr;</span>
+      <div class="pipeline-step">JSON Results</div>
+      <span class="pipeline-arrow">&rarr;</span>
+      <div class="pipeline-step" style="border-color:var(--accent-purple)">Compare & Plot</div>
+    </div>
+  </div>
+</div>
+
+<script>
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = '#1e293b';
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 11;
+
+const quants = ['BF16', 'Q4_K', 'Q6_K', 'GPTQ-INT4', 'FP8'];
+const nvThroughput = [2847, 4312, 3890, 5108, 4750];
+const amdThroughput = [2510, 3920, 3450, 4650, 4200];
+
+new Chart(document.getElementById('throughputChart'), {
+  type: 'bar',
+  data: {
+    labels: quants,
+    datasets: [
+      {
+        label: 'NVIDIA',
+        data: nvThroughput,
+        backgroundColor: 'rgba(118, 185, 0, 0.7)',
+        borderColor: '#76b900',
+        borderWidth: 1,
+        borderRadius: 4,
+      },
+      {
+        label: 'AMD',
+        data: amdThroughput,
+        backgroundColor: 'rgba(237, 28, 36, 0.6)',
+        borderColor: '#ed1c24',
+        borderWidth: 1,
+        borderRadius: 4,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: { display: true, text: 'Tokens / sec' },
+        grid: { color: 'rgba(255,255,255,0.04)' },
+      },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+const ttftP50  = [18.2, 12.1, 14.8, 10.5, 11.9];
+const ttftP95  = [31.5, 22.4, 26.1, 19.8, 21.3];
+const ttftP99  = [48.7, 35.6, 39.2, 28.4, 30.8];
+
+new Chart(document.getElementById('latencyChart'), {
+  type: 'bar',
+  data: {
+    labels: quants,
+    datasets: [
+      {
+        label: 'P50',
+        data: ttftP50,
+        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+        borderRadius: 4,
+      },
+      {
+        label: 'P95',
+        data: ttftP95,
+        backgroundColor: 'rgba(139, 92, 246, 0.7)',
+        borderRadius: 4,
+      },
+      {
+        label: 'P99',
+        data: ttftP99,
+        backgroundColor: 'rgba(6, 182, 212, 0.6)',
+        borderRadius: 4,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: { display: true, text: 'Milliseconds' },
+        grid: { color: 'rgba(255,255,255,0.04)' },
+      },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+const memData = [
+  { label: 'BF16', pct: 100, color: '#3b82f6' },
+  { label: 'Q6_K', pct: 62, color: '#8b5cf6' },
+  { label: 'Q4_K', pct: 45, color: '#06b6d4' },
+  { label: 'GPTQ', pct: 42, color: '#76b900' },
+  { label: 'FP8', pct: 55, color: '#ff6f00' },
+];
+
+const container = document.getElementById('memBars');
+memData.forEach(d => {
+  const saved = 100 - d.pct;
+  container.innerHTML += `
+    <div class="quant-row">
+      <span class="quant-label">${d.label}</span>
+      <div class="quant-bar-track">
+        <div class="quant-bar-fill" style="width:${d.pct}%;background:${d.color}">
+          ${saved > 0 ? `-${saved}%` : 'baseline'}
+        </div>
+      </div>
+    </div>
+  `;
+});
+
+setTimeout(() => {
+  document.querySelectorAll('.quant-bar-fill').forEach(bar => {
+    const w = bar.style.width;
+    bar.style.width = '0%';
+    requestAnimationFrame(() => { bar.style.width = w; });
+  });
+}, 200);
+</script>
+</body>
+</html>

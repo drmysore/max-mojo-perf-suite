@@ -1,0 +1,23 @@
+hardware:
+  nvidia:
+    docker_image: "modular/max-nvidia-full:latest"
+    docker_flags: "--gpus=all"
+    gpu_stats: true
+    env:
+      CUDA_VISIBLE_DEVICES: "0"
+
+  amd:
+    docker_image: "modular/max-amd:latest"
+    docker_flags: "--device /dev/kfd --device /dev/dri --group-add video"
+    gpu_stats: true
+    env:
+      HIP_VISIBLE_DEVICES: "0"
+
+  common:
+    volumes:
+      - "${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface"
+      - "${MAX_CACHE:-~/.max_cache}:/root/.max_cache"
+    ports:
+      - "8000:8000"
+    env:
+      HF_TOKEN: "${HF_TOKEN}"
